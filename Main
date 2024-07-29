@@ -1,0 +1,314 @@
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import ttk
+import sqlite3
+import pandas as pd
+from PIL import Image, ImageTk
+from tkinter import PhotoImage,Label
+import winsound
+
+
+global tree,owner_button,customer_button,exit_button,submit_button,password
+
+def clear_checkboxes():
+    for var in food_items:
+        var.set(0)
+    review_entry.delete(0, 'end')
+
+def submit_review():
+    snd_button()
+    review_text = review_entry.get()
+    if not review_text:
+        messagebox.showerror("Error", "Please enter a review.")
+        return
+
+    selected_items = [food_item.get() for food_item in food_items]
+    for i, item in enumerate(selected_items):
+        if item:
+            sentiment = predict_sentiment(review_text)
+
+        # Update the database
+            conn = sqlite3.connect('food_reviews.db')
+            cursor = conn.cursor()
+
+            if sentiment == 1:
+                cursor.execute('''
+                    UPDATE food_rev 
+                    SET 
+                    positive_reviews = positive_reviews + 1
+                WHERE 
+                    food_item=?
+                ''', (food_names[i],))
+                cursor.execute('''
+                    UPDATE food_rev 
+                    SET 
+                    positive_rate = (positive_reviews/(negative_reviews + positive_reviews))*100,
+                    negative_rate = (negative_reviews/(negative_reviews + positive_reviews))*100''')
+            elif sentiment == 0:
+                cursor.execute('''
+                UPDATE food_rev 
+                SET 
+                    negative_reviews = negative_reviews + 1
+                WHERE 
+                    food_item=?
+                ''', (food_names[i],))
+                cursor.execute('''
+                    UPDATE food_rev 
+                    SET 
+                    positive_rate = (positive_reviews/(negative_reviews + positive_reviews))*100,
+                    negative_rate = (negative_reviews/(negative_reviews + positive_reviews))*100''')
+        # Placeholder for your sentiment analysis model
+        
+
+            conn.commit()
+            conn.close()
+    
+
+    messagebox.showinfo("Review Submitted", "Review submitted successfully!")
+    clear_checkboxes()
+
+def predict_sentiment(review_text):
+    sample_review = re.sub(pattern='[^a-zA-Z]',repl=' ', string = review_text)
+    sample_review = sample_review.lower()
+    sample_review_words = sample_review.split()
+    full_words = sample_review_words
+    sample_review_words = [word for word in sample_review_words if not word in set(stopwords.words('english'))]
+    ps = PorterStemmer()
+    final_review = [ps.stem(word) for word in sample_review_words]
+    final_review = ' '.join(final_review)
+
+    temp = cv.transform([final_review]).toarray()
+    
+    if 'not' in full_words:
+         return 1 if classifier.predict(temp) == 0 else 0
+
+    return classifier.predict(temp)
+
+
+def pad_text(text, desired_width):
+    total_padding = desired_width - len(text)
+    left_padding = total_padding // 2
+    right_padding = total_padding - left_padding
+    return ' ' * left_padding + text + ' ' * right_padding
+
+def owner_interface():
+    snd_button()
+    global owner_button,customer_button,exit_button,clear_button
+    customer_button.place_forget()
+    owner_button.place_forget()
+    canvas.itemconfig(bg_image, state="hidden")
+    exit_button.pack()
+    exit_button.place(x = 900,y = 500)
+    passw_label.pack()
+    passw_label.place(x = 565,y = 200)
+    passw_entry.pack()
+    passw_entry.place(x = 550,y = 250)
+    enter_button.pack()
+    enter_button.place(x = 500,y = 300)
+    
+    background_image = PhotoImage(file="white_brick.png")
+    
+    canvas.create_image(0, 0, image=background_image, anchor="nw")
+    root.mainloop()
+
+def view_table():
+    snd_button()
+    password = passw_entry.get()
+    passw_entry.delete(0, 'end')
+    if(password == "abcd"):
+        for widget in root.winfo_children():
+            widget.place_forget()
+        for row in tree.get_children():
+            tree.delete(row)
+
+        connection = sqlite3.connect('food_reviews.db')
+        cursor = connection.cursor()
+        cursor.execute("SELECT * FROM food_rev")
+        rows = cursor.fetchall()
+        connection.close()
+        style.configure("Treeview.Heading", font=("Arial", 14))  # Change the font size here
+
+        tree.tag_configure('Treeview', font=('Arial', 14))
+        
+        style2 = ttk.Style()
+        style2.configure("Treeview", font=('Arial', 14), rowheight=30,padding=(20, 5))  # Change the font size here
+        
+        #tree.tag_configure('my_tag', font=('Arial', 14))
+
+        for row in rows:
+            padded_row = [pad_text(str(item), 30) for item in row]
+            tree.insert("", "end", values=padded_row)
+
+        # Change the font size for all rows
+        for item in tree.get_children():
+            tree.tag_configure(item, font=('Arial', 14))
+            
+        
+        tree.pack()
+        tree.place(x = 135,y = 100)
+    
+        clear_button.pack()
+        clear_button.place(x = 500,y = 50)
+        
+    
+    else:
+        messagebox.showinfo("Wrong password","Wrong password!")
+        
+    exit_button.pack()
+    exit_button.place(x = 900,y = 500)
+    
+# Function to show customer interface
+def customer_interface():
+    # Hide Customer and Owner buttons
+    snd_button()
+    global owner_button,customer_button,exit_button,submit_button
+    customer_button.place_forget()
+    owner_button.place_forget()
+    
+    canvas.itemconfig(bg_image, state="hidden")
+    style = ttk.Style()
+
+    style.configure("TCheckbutton", indicatorbackground="black", indicatorforeground="white",
+                background="black", foreground="white", font=("Arial", 15),width = 20)
+    style.map("TCheckbutton", foreground=[('selected', '#03fcf8'), ('active', 'black')])
+    # Create checkboxes
+    for i, item in enumerate(food_names):
+        checkbox = ttk.Checkbutton(root, text=item, variable=food_items[i], style="TCheckbutton")
+
+        if i < 5:
+            checkbox.place(x=250, y=50 + i*50)
+        elif 5 <= i < 10:
+            checkbox.place(x=550, y=50 + (i-5)*50)
+        else:
+            checkbox.place(x=850, y=50 + (i-10)*50)
+    # Create review entry
+    review_label.pack()
+    review_entry.pack()
+    review_label.place(x = 570,y = 350)
+    review_entry.place(x = 500,y = 400)
+
+    # Create submit button
+    submit_button.pack()
+    submit_button.place(x = 540,y = 450)
+    # Show the Exit button
+    exit_button.pack()
+    exit_button.place(x = 900,y = 500)
+    
+    background_image = PhotoImage(file="white_brick.png")
+    
+    canvas.create_image(0, 0, image=background_image, anchor="nw")
+    
+    
+    root.mainloop()
+    
+# Function to return to the front page
+def return_to_front():
+    snd_button()
+    global owner_button,customer_button,exit_button
+    exit_button.place_forget()
+
+    for widget in root.winfo_children():
+        widget.place_forget()
+
+    customer_button.pack()
+    customer_button.place(x=550,y=300)
+
+    owner_button.pack()
+    owner_button.place(x=550,y=400)
+    
+    background_image = PhotoImage(file="heading.png")
+    
+    canvas.create_image(0, 0, image=background_image, anchor="nw")
+    root.mainloop()
+
+
+    
+def clear_reviews():
+    snd_button()
+    conn = sqlite3.connect('food_reviews.db')
+    cursor = conn.cursor()
+
+    for food_item in food_names:
+        cursor.execute('UPDATE food_rev SET positive_reviews = 0, negative_reviews = 0,positive_rate = 0.0,negative_rate = 0.0')
+
+    conn.commit()
+    conn.close()
+
+    messagebox.showinfo("Reviews Cleared", "All reviews reset successfully!")
+
+
+
+# Create the main window
+root = tk.Tk()
+root.title("Owner and Customer Interface")
+root.geometry("800x600")  # Increase window size
+
+sound_path1 = "mouse_click.wav"
+def snd_button():
+    winsound.PlaySound(sound_path1, winsound.SND_FILENAME)
+
+canvas = tk.Canvas(root, width=1200, height=800)
+canvas.pack(fill="both", expand=True)
+
+
+# Initialize SQLite database
+conn = sqlite3.connect('food_reviews.db')
+cursor = conn.cursor()
+
+# Define food items
+food_names = ['pizza', 'burger', 'pasta', 'noodles', 'tacos','mojito','blue lagoon','ice tea','green tea','hot chocolate','pista ice cream','chocolate ice cream','cookies and cream','black current ice cream','vanilla ice cream']
+
+
+style = ttk.Style()
+style.theme_use('alt')
+style.configure('TButton', background = 'Black',font=("Arial", 14), padding=(10, 7), foreground = 'white', width = 20, borderwidth=1, focusthickness=3, focuscolor='none')
+style.map('TButton', background=[('active','Black')])
+
+clear_button = ttk.Button(root, text="Clear Reviews", command=clear_reviews, width=20, style="TButton")
+
+customer_button = ttk.Button(root, text="Customer", command=customer_interface, width=20, style="TButton")
+customer_button.pack()
+customer_button.place(x=550,y=300)
+
+space_label = ttk.Label(root, text="")
+space_label.pack()
+
+owner_button = ttk.Button(root, text="Owner", command=owner_interface, width=20, style="TButton")
+owner_button.pack()
+owner_button.place(x=550,y=400)
+
+exit_button = ttk.Button(root, text="Exit", command=return_to_front, width=20, style="TButton")
+
+
+
+food_items = [tk.BooleanVar() for _ in range(len(food_names))]
+
+tree = ttk.Treeview(root, columns=("Food Item", "Positive", "Negative","Positive Rate","Negative Rate"), show="headings")
+tree.heading("Food Item", text="Food Item")
+tree.heading("Positive", text="Positive")
+tree.heading("Negative", text="Negative")
+tree.heading("Positive Rate", text="Positive Rate")
+tree.heading("Negative Rate", text="Negative Rate")
+
+tree["height"] = 10 
+
+style2 = ttk.Style()
+style2.configure("TEntry",padding = (0,5))
+
+style3 = ttk.Style()
+
+
+style3.configure("TLabel", font=("Arial", 16),background = "Black",foreground = "White") 
+review_label = ttk.Label(root, text="Enter your review",style = "TLabel")
+review_entry = ttk.Entry(root,style = "TEntry", width=50)
+submit_button = ttk.Button(root, text="Submit Review", command=submit_review)
+
+enter_button = ttk.Button(root,text = "Enter",command = view_table)
+passw_label = ttk.Label(root,text = "Password")
+passw_entry = ttk.Entry(root,show = "*")
+
+bg_image = PhotoImage(file="heading.png")
+    
+canvas.create_image(0, 0, image=bg_image, anchor="nw")
+
+root.mainloop()
