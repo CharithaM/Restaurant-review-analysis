@@ -1,0 +1,42 @@
+import sqlite3
+
+conn = sqlite3.connect('food_reviews.db')
+
+cursor = conn.cursor()
+
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS food_rev (
+        food_item TEXT PRIMARY KEY,
+        positive_reviews FLOAT,
+        negative_reviews FLOAT,
+        positive_rate FLOAT,
+        negative_rate FLOAT
+    )
+''')
+
+initial_food_items = [
+    ('pizza', 0, 0,0.0,0.0),
+    ('burger', 0, 0, 0.0,0.0),
+    ('pasta', 0, 0, 0.0,0.0),
+    ('noodles', 0, 0, 0.0, 0.0),
+    ('tacos', 0, 0, 0.0, 0.0),
+    ('mojito', 0, 0,0.0,0.0),
+    ('blue lagoon', 0, 0, 0.0,0.0),
+    ('ice tea', 0, 0, 0.0,0.0),
+    ('green tea', 0, 0, 0.0, 0.0),
+    ('hot chocolate', 0, 0, 0.0, 0.0),
+    ('pista ice cream', 0, 0,0.0,0.0),
+    ('chocolate ice cream', 0, 0, 0.0,0.0),
+    ('cookies and cream', 0, 0, 0.0,0.0),
+    ('black current ice cream', 0, 0, 0.0, 0.0),
+    ('vanilla ice cream', 0, 0, 0.0, 0.0)
+]
+
+cursor.executemany('''
+    INSERT INTO food_rev (food_item, positive_reviews, negative_reviews,positive_rate,negative_rate)
+    VALUES (?, ?, ?,?,?)
+''', initial_food_items)
+
+conn.commit()
+conn.close()
+
